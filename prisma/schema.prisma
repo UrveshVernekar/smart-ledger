@@ -12,9 +12,164 @@ datasource db {
   provider = "postgresql"
 }
 
+enum AccountNature {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum EntryType {
+  DEBIT
+  CREDIT
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
+  id String @id @default(uuid())
+
+  email String  @unique
+  name  String?
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdJournals JournalEntry[]
+}
+
+model FinancialYear {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  name String
+
+  startDate DateTime
+  endDate   DateTime
+
+  isClosed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model JournalEntryLine {
+  id String @id @default(cuid())
+
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+
+  entryType EntryType
+
+  amount Decimal @db.Decimal(18, 2)
+
+  description String?
+
+  createdAt DateTime @default(now())
+}
+
+model JournalEntry {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  voucherNumber String @unique
+
+  date DateTime
+
+  narration String?
+
+  reference String?
+
+  status JournalStatus @default(DRAFT)
+
+  totalDebit  Decimal @db.Decimal(18, 2)
+  totalCredit Decimal @db.Decimal(18, 2)
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  lines JournalEntryLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  groupId String
+  group   AccountGroup @relation(fields: [groupId], references: [id])
+
+  code String
+  name String
+
+  openingBalance Decimal @default(0) @db.Decimal(18, 2)
+
+  isSystem Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  journalLines JournalEntryLine[]
+
+  @@unique([companyId, code])
+}
+
+model AccountGroup {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  name String
+  code String
+
+  nature AccountNature
+
+  parentId String?
+  parent   AccountGroup? @relation("AccountGroupHierarchy", fields: [parentId], references: [id])
+
+  children AccountGroup[] @relation("AccountGroupHierarchy")
+
+  accounts Account[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, code])
+}
+
+model Company {
+  id String @id @default(cuid())
+
+  name String
+
+  gstNumber String?
+  panNumber String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  financialYears FinancialYear[]
+
+  accountGroups AccountGroup[]
+  accounts      Account[]
+
+  journalEntries JournalEntry[]
 }
